@@ -241,11 +241,27 @@ this stack, both unrelated to SEO4Ajax but usually discovered at the same time.
 The first is the Content-Security-Policy. Storefront Next ships a strict CSP
 with no `'unsafe-inline'` in `script-src`, relying on a per-request nonce. A
 nonce only applies to tags the browser parsed from the document, so anything a
-vendor's bootstrap injects at runtime can only be admitted by origin. Add the
-vendor's asset origin to `script-src` and `style-src`, and its API origin —
-often a different host — to `connect-src`, by spreading `defaultCspDirectives`
-in `config.server.ts`. Each directive you set replaces the default entirely, so
-spread it or you will drop `'self'`.
+vendor's bootstrap injects at runtime can only be admitted by origin.
+
+Expect a widget to need several origins, in more than one directive. A typical
+bootstrap is a few kilobytes that injects the real bundle and a stylesheet from
+an asset host, which then calls an API on a different host, and may pull fonts,
+images or analytics from others again. Rather than guess, enumerate them: turn
+the policy off enforcement, exercise the page, and read the violations back out
+of DevTools.
+
+```ts
+// config.server.ts — or PUBLIC__app__security__headers__csp__reportOnly=true
+security: { headers: { csp: { reportOnly: true } } }
+```
+
+Each violation names both the blocked URL and the directive that rejected it,
+which is exactly what you need. Add those origins by spreading
+`defaultCspDirectives` in `config.server.ts` — each directive you set replaces
+the default entirely, so spread it or you will drop `'self'` — then set
+`reportOnly` back to `false` and confirm the console is clean. Grant the exact
+origins you observed rather than a wildcard over the vendor's domain: the list
+from a report-only run is the smallest one that works.
 
 The second is hydration. A `<script>` tag in a route's JSX executes while the
 browser parses the document, which is before React hydrates; by then the widget
